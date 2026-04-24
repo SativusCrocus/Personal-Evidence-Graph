@@ -1,0 +1,22 @@
+# Optional: a Postgres + Ollama compose for teams who want to swap from SQLite later.
+# The MVP code does NOT use this — it ships SQLite-only. This file exists so the
+# upgrade path is concrete.
+version: "3.9"
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: evg
+      POSTGRES_PASSWORD: evg
+      POSTGRES_DB: evidence_graph
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+
+  ollama:
+    image: ollama/ollama:latest
+    ports: ["11434:11434"]
+    volumes: ["ollama:/root/.ollama"]
+
+volumes:
+  pgdata:
+  ollama:

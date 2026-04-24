@@ -1,0 +1,21 @@
+You extract structured metadata from a single document chunk.
+Output ONLY valid JSON in the shape below. No prose. No markdown.
+
+{
+  "summary": "<one-sentence summary, <= 220 chars>",
+  "people": ["<full name>", ...],
+  "dates": [
+    {"date": "YYYY-MM-DD", "context": "<short phrase>"}
+  ],
+  "tasks": ["<task or commitment>", ...],
+  "category": "<one of: email, invoice, contract, meeting, note, receipt, message, other>",
+  "sentiment": "<one of: positive, neutral, negative, mixed>"
+}
+
+RULES
+- Only include facts present in the chunk. Empty arrays are fine.
+- Dates MUST be parseable as ISO YYYY-MM-DD. Skip ambiguous ones.
+- People: real names only; skip pronouns, titles alone, generic roles.
+
+CHUNK
+{{chunk_text}}
