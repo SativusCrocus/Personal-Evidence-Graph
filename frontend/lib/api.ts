@@ -1,9 +1,18 @@
 /**
  * Typed client for the Personal Evidence Graph backend.
+ *
  * All paths go through Next's /api/* rewrite to the FastAPI server.
+ *
+ * When the real backend is unreachable (which is the case for the public
+ * Vercel preview, since the backend is local-only by design), every call
+ * transparently falls back to a seeded demo dataset under lib/demo/.
+ * The demo flag is sticky once set, surfaced via subscribeDemoMode() so
+ * the Topbar can render a "Demo mode" banner.
  */
 
 const BASE = '/api';
+
+// ───────────────────────── domain types ─────────────────────────
 
 export type SourceType =
   | 'pdf' | 'image' | 'audio' | 'text' | 'browser' | 'clipboard' | 'video' | 'other';
@@ -98,6 +107,119 @@ export interface Stats {
   by_source_type: Record<string, number>;
 }
 
+// New domain types — designed in the demo layer first, will land in the
+// backend when the claim/contradiction/obligation engines are built.
+
+export type ClaimStatus = 'supported' | 'contradicted' | 'uncertain' | 'refused';
+
+export interface Claim {
+  id: string;
+  text: string;
+  status: ClaimStatus;
+  confidence: number;
+  source_chunk_id: string;
+  source_file_id: string;
+  source_excerpt: string;
+  source_dt: string | null;
+  contradiction_id?: string;
+  obligation_id?: string;
+}
+
+export type ContradictionSeverity = 'low' | 'medium' | 'high';
+
+export interface Contradiction {
+  id: string;
+  topic: string;
+  summary: string;
+  severity: ContradictionSeverity;
+  detected_at: string;
+  claim_ids: string[];
+  related_chunk_ids: string[];
+}
+
+export type ObligationDirection = 'incoming' | 'outgoing';
+export type ObligationStatus = 'open' | 'overdue' | 'completed' | 'cancelled';
+
+export interface Obligation {
+  id: string;
+  text: string;
+  counterparty: string;
+  direction: ObligationDirection;
+  due_at: string;
+  status: ObligationStatus;
+  claim_id: string;
+  source_chunk_id: string;
+  source_file_id: string;
+  source_excerpt: string;
+}
+
+export type PipelineStage =
+  | 'received' | 'hashed' | 'extracted' | 'chunked' | 'embedded' | 'indexed' | 'queryable';
+export type PipelineStatus = 'success' | 'failed' | 'retried';
+
+export interface PipelineEvent {
+  id: string;
+  file_id: string;
+  stage: PipelineStage;
+  status: PipelineStatus;
+  at: string;
+  message?: string;
+}
+
+// ───────────────────────── demo-mode plumbing ─────────────────────────
+
+const FORCED_DEMO =
+  typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DEMO_MODE === '1';
+
+let isDemo = FORCED_DEMO;
+let probed = FORCED_DEMO;
+const demoListeners = new Set<(on: boolean) => void>();
+
+function setDemo(on: boolean) {
+  if (isDemo === on) return;
+  isDemo = on;
+  demoListeners.forEach((fn) => fn(on));
+}
+
+export function isDemoMode(): boolean {
+  return isDemo;
+}
+
+export function subscribeDemoMode(fn: (on: boolean) => void): () => void {
+  demoListeners.add(fn);
+  fn(isDemo);
+  return () => demoListeners.delete(fn);
+}
+
+const PROBE_TIMEOUT_MS = 2000;
+
+async function fetchWithTimeout(input: string, init?: RequestInit, ms = PROBE_TIMEOUT_MS): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(input, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** Race the real call against demo fallback. Sticky once demo is detected. */
+async function withDemo<T>(
+  real: () => Promise<T>,
+  demo: () => T | Promise<T>,
+): Promise<T> {
+  if (isDemo) return demo();
+  try {
+    const out = await real();
+    probed = true;
+    return out;
+  } catch {
+    probed = true;
+    setDemo(true);
+    return demo();
+  }
+}
+
 async function jsonOrThrow<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let detail: string;
@@ -112,55 +234,109 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
+// ───────────────────────── public API ─────────────────────────
+
 export const api = {
   async health(): Promise<Health> {
-    return jsonOrThrow(await fetch(`${BASE}/health`, { cache: 'no-store' }));
+    return withDemo(
+      async () => jsonOrThrow<Health>(await fetchWithTimeout(`${BASE}/health`, { cache: 'no-store' })),
+      async () => (await import('./demo/fixtures')).health,
+    );
   },
 
   async ingestFile(file: File): Promise<IngestResponse> {
-    const fd = new FormData();
-    fd.append('upload', file);
-    return jsonOrThrow(await fetch(`${BASE}/ingest/file`, { method: 'POST', body: fd }));
+    return withDemo(
+      async () => {
+        const fd = new FormData();
+        fd.append('upload', file);
+        return jsonOrThrow<IngestResponse>(await fetchWithTimeout(`${BASE}/ingest/file`, { method: 'POST', body: fd }, 8000));
+      },
+      async () => (await import('./demo/fixtures')).fakeIngest(file.name),
+    );
   },
 
   async ingestFolder(path: string, recursive = true): Promise<IngestResponse[]> {
-    return jsonOrThrow(await fetch(`${BASE}/ingest/folder`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path, recursive }),
-    }));
+    return withDemo(
+      async () => jsonOrThrow<IngestResponse[]>(await fetchWithTimeout(`${BASE}/ingest/folder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path, recursive }),
+      })),
+      async () => {
+        const fx = await import('./demo/fixtures');
+        return [fx.fakeIngest(`folder:${path}`)];
+      },
+    );
   },
 
   async ingestClipboard(text: string, source?: string): Promise<IngestResponse> {
-    return jsonOrThrow(await fetch(`${BASE}/ingest/clipboard`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, source }),
-    }));
+    return withDemo(
+      async () => jsonOrThrow<IngestResponse>(await fetchWithTimeout(`${BASE}/ingest/clipboard`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, source }),
+      })),
+      async () => (await import('./demo/fixtures')).fakeIngest(source ?? 'clipboard'),
+    );
   },
 
   async query(question: string, opts?: {
     k?: number; source_types?: SourceType[]; date_from?: string; date_to?: string;
   }): Promise<AnswerResponse> {
-    return jsonOrThrow(await fetch(`${BASE}/query`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, ...(opts || {}) }),
-    }));
+    return withDemo(
+      async () => jsonOrThrow<AnswerResponse>(await fetchWithTimeout(`${BASE}/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, ...(opts || {}) }),
+      }, 6000)),
+      async () => {
+        const fx = await import('./demo/fixtures');
+        // Slight delay so the loading state is visible in demo mode.
+        await new Promise((r) => setTimeout(r, 320));
+        return fx.answerForQuestion(question);
+      },
+    );
   },
 
   async timeline(opts?: { from?: string; to?: string; kind?: string; q?: string }): Promise<TimelineEvent[]> {
-    const p = new URLSearchParams();
-    if (opts?.from) p.set('from', opts.from);
-    if (opts?.to) p.set('to', opts.to);
-    if (opts?.kind) p.set('kind', opts.kind);
-    if (opts?.q) p.set('q', opts.q);
-    p.set('limit', '500');
-    return jsonOrThrow(await fetch(`${BASE}/timeline?${p.toString()}`, { cache: 'no-store' }));
+    return withDemo(
+      async () => {
+        const p = new URLSearchParams();
+        if (opts?.from) p.set('from', opts.from);
+        if (opts?.to) p.set('to', opts.to);
+        if (opts?.kind) p.set('kind', opts.kind);
+        if (opts?.q) p.set('q', opts.q);
+        p.set('limit', '500');
+        return jsonOrThrow<TimelineEvent[]>(await fetchWithTimeout(`${BASE}/timeline?${p.toString()}`, { cache: 'no-store' }));
+      },
+      async () => {
+        const fx = await import('./demo/fixtures');
+        let rows = fx.timeline.slice();
+        if (opts?.from) rows = rows.filter((e) => e.occurred_at >= opts.from!);
+        if (opts?.to) rows = rows.filter((e) => e.occurred_at <= opts.to!);
+        if (opts?.kind) rows = rows.filter((e) => e.kind === opts.kind);
+        if (opts?.q) {
+          const q = opts.q.toLowerCase();
+          rows = rows.filter((e) =>
+            e.title.toLowerCase().includes(q) || (e.description ?? '').toLowerCase().includes(q),
+          );
+        }
+        rows.sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1));
+        return rows;
+      },
+    );
   },
 
   async evidence(chunkId: string): Promise<EvidenceDetail> {
-    return jsonOrThrow(await fetch(`${BASE}/evidence/${encodeURIComponent(chunkId)}`, { cache: 'no-store' }));
+    return withDemo(
+      async () => jsonOrThrow<EvidenceDetail>(await fetchWithTimeout(`${BASE}/evidence/${encodeURIComponent(chunkId)}`, { cache: 'no-store' })),
+      async () => {
+        const fx = await import('./demo/fixtures');
+        const ev = fx.evidenceFor(chunkId);
+        if (!ev) throw new Error(`Chunk ${chunkId} not in demo dataset`);
+        return ev;
+      },
+    );
   },
 
   fileRawUrl(fileId: string): string {
@@ -168,22 +344,81 @@ export const api = {
   },
 
   async listFiles(opts?: { status?: string; source_type?: string; q?: string }): Promise<FileSummary[]> {
-    const p = new URLSearchParams();
-    if (opts?.status) p.set('status', opts.status);
-    if (opts?.source_type) p.set('source_type', opts.source_type);
-    if (opts?.q) p.set('q', opts.q);
-    return jsonOrThrow(await fetch(`${BASE}/files?${p.toString()}`, { cache: 'no-store' }));
+    return withDemo(
+      async () => {
+        const p = new URLSearchParams();
+        if (opts?.status) p.set('status', opts.status);
+        if (opts?.source_type) p.set('source_type', opts.source_type);
+        if (opts?.q) p.set('q', opts.q);
+        return jsonOrThrow<FileSummary[]>(await fetchWithTimeout(`${BASE}/files?${p.toString()}`, { cache: 'no-store' }));
+      },
+      async () => {
+        const fx = await import('./demo/fixtures');
+        let rows = fx.files.slice();
+        if (opts?.status) rows = rows.filter((f) => f.status === opts.status);
+        if (opts?.source_type) rows = rows.filter((f) => f.source_type === opts.source_type);
+        if (opts?.q) {
+          const q = opts.q.toLowerCase();
+          rows = rows.filter((f) => f.display_name.toLowerCase().includes(q));
+        }
+        return rows;
+      },
+    );
   },
 
   async deleteFile(fileId: string): Promise<{ deleted: boolean }> {
-    return jsonOrThrow(await fetch(`${BASE}/files/${encodeURIComponent(fileId)}`, { method: 'DELETE' }));
+    return withDemo(
+      async () => jsonOrThrow<{ deleted: boolean }>(await fetchWithTimeout(`${BASE}/files/${encodeURIComponent(fileId)}`, { method: 'DELETE' })),
+      async () => ({ deleted: true }),
+    );
   },
 
   async stats(): Promise<Stats> {
-    return jsonOrThrow(await fetch(`${BASE}/files/_/stats`, { cache: 'no-store' }));
+    return withDemo(
+      async () => jsonOrThrow<Stats>(await fetchWithTimeout(`${BASE}/files/_/stats`, { cache: 'no-store' })),
+      async () => (await import('./demo/fixtures')).stats,
+    );
   },
 
   async reindex(): Promise<{ queued: boolean }> {
-    return jsonOrThrow(await fetch(`${BASE}/reindex`, { method: 'POST' }));
+    return withDemo(
+      async () => jsonOrThrow<{ queued: boolean }>(await fetchWithTimeout(`${BASE}/reindex`, { method: 'POST' })),
+      async () => ({ queued: true }),
+    );
+  },
+
+  // ───────── new endpoints (demo-only until the backend ships them) ─────────
+
+  async claims(): Promise<Claim[]> {
+    return withDemo(
+      async () => jsonOrThrow<Claim[]>(await fetchWithTimeout(`${BASE}/claims`, { cache: 'no-store' })),
+      async () => (await import('./demo/fixtures')).claims,
+    );
+  },
+
+  async contradictions(): Promise<Contradiction[]> {
+    return withDemo(
+      async () => jsonOrThrow<Contradiction[]>(await fetchWithTimeout(`${BASE}/contradictions`, { cache: 'no-store' })),
+      async () => (await import('./demo/fixtures')).contradictions,
+    );
+  },
+
+  async obligations(): Promise<Obligation[]> {
+    return withDemo(
+      async () => jsonOrThrow<Obligation[]>(await fetchWithTimeout(`${BASE}/obligations`, { cache: 'no-store' })),
+      async () => (await import('./demo/fixtures')).obligations,
+    );
+  },
+
+  async pipelineEvents(): Promise<PipelineEvent[]> {
+    return withDemo(
+      async () => jsonOrThrow<PipelineEvent[]>(await fetchWithTimeout(`${BASE}/pipeline/events`, { cache: 'no-store' })),
+      async () => (await import('./demo/fixtures')).pipelineEvents,
+    );
   },
 };
+
+// Useful for the dashboard to know whether we already probed.
+export function hasProbedBackend(): boolean {
+  return probed;
+}
