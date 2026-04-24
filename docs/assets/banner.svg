@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" fill="none" role="img" aria-label="Personal Evidence Graph">
+  <defs>
+    <linearGradient id="bbg" x1="0" y1="0" x2="1200" y2="360" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#0B0712"/>
+      <stop offset="55%"  stop-color="#1A0B33"/>
+      <stop offset="100%" stop-color="#2E1065"/>
+    </linearGradient>
+    <linearGradient id="bnode" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E9D5FF"/>
+    </linearGradient>
+    <linearGradient id="word" x1="0" y1="0" x2="0" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#C4B5FD"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="200" cy="180" r="220" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"  stop-color="#8B5CF6" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#8B5CF6" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="bglow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="360" rx="32" fill="url(#bbg)"/>
+  <rect width="1200" height="360" rx="32" fill="url(#halo)"/>
+
+  <g transform="translate(80,52)">
+    <rect width="256" height="256" rx="56" fill="#7C3AED" fill-opacity="0.18" stroke="#8B5CF6" stroke-opacity="0.35" stroke-width="2"/>
+    <g stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="5" stroke-linecap="round">
+      <line x1="64"  y1="76"  x2="128" y2="128"/>
+      <line x1="192" y1="76"  x2="128" y2="128"/>
+      <line x1="64"  y1="180" x2="128" y2="128"/>
+      <line x1="192" y1="180" x2="128" y2="128"/>
+      <line x1="64"  y1="76"  x2="64"  y2="180"/>
+      <line x1="192" y1="76"  x2="192" y2="180"/>
+    </g>
+    <g fill="url(#bnode)">
+      <circle cx="64"  cy="76"  r="14"/>
+      <circle cx="192" cy="76"  r="14"/>
+      <circle cx="64"  cy="180" r="14"/>
+      <circle cx="192" cy="180" r="14"/>
+    </g>
+    <g filter="url(#bglow)">
+      <circle cx="128" cy="128" r="34" fill="#FFFFFF"/>
+    </g>
+    <path d="M112 130 L124 142 L146 116"
+          stroke="#5B21B6" stroke-width="7"
+          stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+
+  <g transform="translate(400,140)">
+    <text x="0" y="0"
+          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, system-ui, sans-serif"
+          font-weight="800" font-size="74" letter-spacing="-1.5"
+          fill="url(#word)">Personal Evidence Graph</text>
+    <text x="2" y="58"
+          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, system-ui, sans-serif"
+          font-weight="500" font-size="26" letter-spacing="0.5"
+          fill="#C4B5FD" fill-opacity="0.95">Search your life. Prove everything.</text>
+    <g transform="translate(2,92)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, system-ui, sans-serif" font-size="14" font-weight="600">
+      <rect x="0"   y="0" width="120" height="28" rx="14" fill="#FFFFFF" fill-opacity="0.08" stroke="#A78BFA" stroke-opacity="0.4"/>
+      <text x="60"  y="19" text-anchor="middle" fill="#E9D5FF">Local-first</text>
+      <rect x="132" y="0" width="120" height="28" rx="14" fill="#FFFFFF" fill-opacity="0.08" stroke="#A78BFA" stroke-opacity="0.4"/>
+      <text x="192" y="19" text-anchor="middle" fill="#E9D5FF">Cited answers</text>
+      <rect x="264" y="0" width="138" height="28" rx="14" fill="#FFFFFF" fill-opacity="0.08" stroke="#A78BFA" stroke-opacity="0.4"/>
+      <text x="333" y="19" text-anchor="middle" fill="#E9D5FF">Zero hallucination</text>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none" role="img" aria-label="Personal Evidence Graph logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#5B21B6"/>
+    </linearGradient>
+    <linearGradient id="node" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E9D5FF"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+
+  <g stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="5" stroke-linecap="round">
+    <line x1="64"  y1="76"  x2="128" y2="128"/>
+    <line x1="192" y1="76"  x2="128" y2="128"/>
+    <line x1="64"  y1="180" x2="128" y2="128"/>
+    <line x1="192" y1="180" x2="128" y2="128"/>
+    <line x1="64"  y1="76"  x2="64"  y2="180"/>
+    <line x1="192" y1="76"  x2="192" y2="180"/>
+  </g>
+
+  <g fill="url(#node)">
+    <circle cx="64"  cy="76"  r="14"/>
+    <circle cx="192" cy="76"  r="14"/>
+    <circle cx="64"  cy="180" r="14"/>
+    <circle cx="192" cy="180" r="14"/>
+  </g>
+
+  <g filter="url(#glow)">
+    <circle cx="128" cy="128" r="34" fill="#FFFFFF"/>
+  </g>
+  <path d="M112 130 L124 142 L146 116"
+        stroke="#5B21B6" stroke-width="7"
+        stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
