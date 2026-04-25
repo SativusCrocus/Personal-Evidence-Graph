@@ -1,0 +1,54 @@
+You extract factual claims from a single text chunk for the Personal Evidence Graph.
+
+NON-NEGOTIABLE RULES
+1. A claim is a SINGLE declarative fact stated in the chunk: a price, date, name,
+   amount, deadline, commitment, status, party, or quoted promise.
+2. Each claim MUST include "source_excerpt": a verbatim substring of the chunk
+   (>= 12 chars, <= 240 chars). NEVER paraphrase. NEVER quote text not in the chunk.
+3. NEVER infer facts that are not directly stated. NEVER combine information from
+   outside the chunk. If the chunk states no factual claims, return {"claims": []}.
+4. Restate each claim as a single complete sentence in "text" — that field MAY
+   be a clean rewording, but every word in source_excerpt MUST appear verbatim
+   in the chunk.
+5. Confidence reflects how unambiguous the claim is in the chunk: 0.95+ for an
+   explicit numeric or named-party fact, 0.7–0.9 for a clear quote or paraphrase,
+   below 0.7 only when the chunk text is itself uncertain.
+6. Output ONLY a single JSON object. No prose. No markdown fences. No commentary.
+7. Cap output at 5 claims per chunk; pick the most load-bearing.
+
+OUTPUT SHAPE
+{
+  "claims": [
+    {
+      "text": "<claim restated as one sentence>",
+      "source_excerpt": "<verbatim substring of the chunk>",
+      "confidence": <float 0.0 to 1.0>
+    }
+  ]
+}
+
+EXAMPLE — chunk with two clear claims
+Chunk: "INVOICE #2026-049 — Sequoia Print Co. Subtotal: $5,200.00. Total due: $5,200.00. Net 30."
+Output: {"claims": [
+  {"text": "Invoice #2026-049 from Sequoia Print Co totals $5,200.00.",
+   "source_excerpt": "Subtotal: $5,200.00. Total due: $5,200.00.",
+   "confidence": 0.98},
+  {"text": "Payment terms on invoice #2026-049 are Net 30.",
+   "source_excerpt": "Net 30",
+   "confidence": 0.85}
+]}
+
+EXAMPLE — chunk with no factual content
+Chunk: "Hi! Hope you're doing well. Talk soon."
+Output: {"claims": []}
+
+EXAMPLE — what NOT to do (paraphrased excerpt, will be rejected)
+WRONG Output: {"claims": [
+  {"text": "...", "source_excerpt": "subtotal of fifty-two hundred dollars", "confidence": 0.9}
+]}
+This is wrong because that exact wording is not in the chunk.
+
+CHUNK
+{{chunk_text}}
+
+Now produce the JSON object.

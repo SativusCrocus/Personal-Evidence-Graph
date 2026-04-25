@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     chunk_overlap: int = Field(default=64, ge=0, le=512)
     low_ram_mode: bool = Field(default=False)
 
+    # Claim extraction. Default on so claims populate as users ingest, but
+    # falls back to a silent skip when the LLM isn't reachable so ingestion
+    # never blocks on the LLM being healthy.
+    extract_claims_during_ingest: bool = Field(default=True)
+
     log_level: str = Field(default="INFO")
 
     @field_validator("data_dir", "upload_dir", "chroma_dir", "sqlite_path", mode="after")

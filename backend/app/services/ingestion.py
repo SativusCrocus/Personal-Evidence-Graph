@@ -107,6 +107,7 @@ def ingest_path(
 
         _persist_chunks_and_index(file_id, result.segments, s)
         _mark_status(file_id, "indexed")
+        _maybe_extract_claims(file_id, s)
         return file_id, False
     except Exception as e:  # noqa: BLE001
         log.exception("ingest failed for %s", final_path)
@@ -156,6 +157,7 @@ def ingest_clipboard(text: str, source_label: Optional[str] = None,
     res = extract_clipboard_text(text)
     _persist_chunks_and_index(file_id, res.segments, s)
     _mark_status(file_id, "indexed")
+    _maybe_extract_claims(file_id, s)
     return file_id, False
 
 
@@ -231,3 +233,21 @@ def _mark_status(file_id: str, status: str, error: Optional[str] = None) -> None
         if f:
             f.status = status
             f.error = error
+
+
+def _maybe_extract_claims(file_id: str, settings: Settings) -> None:
+    """Run the LLM claim extractor for a freshly-ingested file. Never raises."""
+    if not settings.extract_claims_during_ingest:
+        return
+    try:
+        from .claim_extraction import extract_for_file_sync
+        result = extract_for_file_sync(file_id, settings=settings)
+        if result.claims_created or result.chunks_failed:
+            log.info(
+                "claim extraction %s: %d claims, %d dropped, %d chunk failures (%dms)",
+                file_id, result.claims_created,
+                result.claims_dropped_invalid, result.chunks_failed,
+                result.elapsed_ms,
+            )
+    except Exception as e:  # noqa: BLE001
+        log.warning("claim extraction step failed for %s: %s", file_id, e)
