@@ -1,0 +1,76 @@
+You decide whether two factual CLAIMS contradict each other for the
+Personal Evidence Graph.
+
+WHAT COUNTS AS A CONTRADICTION
+A contradiction exists when both claims describe the SAME subject (same
+entity, same event, same item, same agreement, same line item) but state
+INCOMPATIBLE facts about it: different prices for the same line item,
+different dates for the same deadline, mutually exclusive statuses,
+conflicting parties.
+
+WHAT DOES NOT COUNT
+- Claims about different things ("Q1 invoice was $4,500" vs "Q2 invoice
+  was $5,200" are NOT a contradiction if the line items genuinely differ).
+- Updates that supersede earlier facts when the change is explicitly
+  authorized by both sources.
+- The same fact stated in different words (a paraphrase is not a conflict).
+- Topic overlap without factual conflict (both claims about the same
+  vendor but on independent matters).
+
+NON-NEGOTIABLE RULES
+1. If you cannot identify a SHARED subject in both claims, return
+   {"is_contradiction": false}.
+2. severity:
+   - "high"   — clear violation of a stated rule, financial discrepancy,
+                broken commitment, or mismatch on identifying numbers.
+   - "medium" — factual conflict that needs human review.
+   - "low"    — minor disagreement that may resolve with more context.
+3. topic: 3–10 words naming the shared subject they disagree about.
+4. summary: 1–3 sentences. State both positions and the disagreement.
+   Do not invent details that are not in the claims or chunks below.
+5. Output ONLY a single JSON object. No prose. No markdown fences.
+
+OUTPUT SHAPE — when contradicting
+{"is_contradiction": true,
+ "topic": "<3-10 words>",
+ "severity": "low" | "medium" | "high",
+ "summary": "<1-3 sentence factual description>"}
+
+OUTPUT SHAPE — when not
+{"is_contradiction": false}
+
+EXAMPLE 1 — clear price contradiction (high)
+CLAIM_A: March invoice total is $4,500.00.
+CHUNK_A: INVOICE #2026-031 — Sequoia Print Co. Subtotal: $4,500.00. Standard production run.
+CLAIM_B: April invoice total is $5,200.00.
+CHUNK_B: INVOICE #2026-049 — Sequoia Print Co. Subtotal: $5,200.00. Standard production run.
+Output:
+{"is_contradiction": true,
+ "topic": "Monthly invoice total — Sequoia Print Co",
+ "severity": "high",
+ "summary": "The March invoice from Sequoia totals $4,500.00 for the standard production run. The April invoice for the same line item totals $5,200.00 — a $700 increase with no notice on file."}
+
+EXAMPLE 2 — unrelated facts
+CLAIM_A: Master Services Agreement signed Feb 12, 2026.
+CHUNK_A: This agreement is entered into on February 12, 2026.
+CLAIM_B: April production cost $87.40 in shipping.
+CHUNK_B: UPS Ground Receipt — Total charge $87.40.
+Output:
+{"is_contradiction": false}
+
+EXAMPLE 3 — same fact, different wording
+CLAIM_A: Sequoia will deliver by April 15.
+CHUNK_A: Sequoia rep: We'll have everything packed and out the door by April 15th.
+CLAIM_B: April delivery is promised by the 15th.
+CHUNK_B: Sequoia rep: out the door by April 15th.
+Output:
+{"is_contradiction": false}
+
+INPUTS
+CLAIM_A: {{claim_a_text}}
+CHUNK_A: {{chunk_a_text}}
+
+CLAIM_B: {{claim_b_text}}
+CHUNK_B: {{chunk_b_text}}
+
+Now produce the JSON object.

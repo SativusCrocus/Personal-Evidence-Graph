@@ -265,3 +265,18 @@ def _maybe_extract_claims(file_id: str, settings: Settings) -> None:
                 )
         except Exception as e:  # noqa: BLE001
             log.warning("obligation extraction step failed for %s: %s", file_id, e)
+
+    if settings.detect_contradictions_during_ingest:
+        try:
+            from .contradiction_detection import detect_for_file_sync as cn_detect
+            cn_result = cn_detect(file_id, settings=settings)
+            if cn_result.contradictions_created or cn_result.pair_errors:
+                log.info(
+                    "contradiction detection %s: %d new (skipped %d dups), "
+                    "%d pairs judged, %d errors (%dms)",
+                    file_id, cn_result.contradictions_created,
+                    cn_result.duplicates_skipped, cn_result.pairs_judged,
+                    cn_result.pair_errors, cn_result.elapsed_ms,
+                )
+        except Exception as e:  # noqa: BLE001
+            log.warning("contradiction detection step failed for %s: %s", file_id, e)

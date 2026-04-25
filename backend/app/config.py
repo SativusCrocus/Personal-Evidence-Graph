@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     # Obligation extraction runs immediately after claim extraction during
     # ingestion. Same silent-skip discipline when the LLM is unreachable.
     extract_obligations_during_ingest: bool = Field(default=True)
+    # Contradiction detection compares each new claim against the K most
+    # similar existing claims via embeddings, then asks the LLM to judge
+    # candidate pairs. Idempotent. Same silent-skip discipline.
+    detect_contradictions_during_ingest: bool = Field(default=True)
 
     log_level: str = Field(default="INFO")
 
