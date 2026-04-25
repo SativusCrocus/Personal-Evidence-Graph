@@ -107,6 +107,28 @@ export interface Stats {
   by_source_type: Record<string, number>;
 }
 
+/**
+ * Operational telemetry surfaced by the dashboard. The backend may not yet
+ * compute every field; the demo fixture fills them in deterministically so
+ * the UI can be validated end-to-end.
+ */
+export interface IndexHealth {
+  total_files: number;
+  total_chunks: number;
+  total_claims: number;
+  total_obligations: number;
+  total_contradictions: number;
+  failed_files: number;
+  ocr_backlog: number;
+  embedding_queue_depth: number;
+  last_ingest_at: string | null;
+  last_query_at: string | null;
+  last_llm_call_at: string | null;
+  index_age_seconds: number | null;
+  db_bytes: number;
+  vector_dim: number;
+}
+
 // New domain types — designed in the demo layer first, will land in the
 // backend when the claim/contradiction/obligation engines are built.
 
@@ -431,6 +453,13 @@ export const api = {
     return withDemo(
       async () => jsonOrThrow<PipelineEvent[]>(await fetchWithTimeout(`${BASE}/pipeline/events`, { cache: 'no-store' })),
       async () => (await import('./demo/fixtures')).pipelineEvents,
+    );
+  },
+
+  async indexHealth(): Promise<IndexHealth> {
+    return withDemo(
+      async () => jsonOrThrow<IndexHealth>(await fetchWithTimeout(`${BASE}/health/index`, { cache: 'no-store' })),
+      async () => (await import('./demo/fixtures')).indexHealth(),
     );
   },
 };

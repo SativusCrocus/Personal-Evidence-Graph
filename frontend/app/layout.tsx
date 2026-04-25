@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/sidebar';
 import { Topbar } from '@/components/topbar';
 import { CommandPaletteProvider } from '@/components/command-palette';
 import { DemoBanner } from '@/components/demo-banner';
+import { TrustStrip } from '@/components/trust-strip';
 
 export const metadata: Metadata = {
   title: 'Personal Evidence Graph — Search Your Life. Prove Everything.',
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="flex-1 min-w-0 flex flex-col">
               <Topbar />
               <DemoBanner />
+              <TrustStrip />
               <main className="flex-1 px-4 md:px-8 py-6 md:py-8 max-w-[1400px] w-full mx-auto">
                 {children}
               </main>

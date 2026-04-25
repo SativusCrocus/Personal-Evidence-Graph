@@ -21,6 +21,7 @@ import {
   ClaimRow, ContradictionCard, ObligationRow, PipelineRow,
   PanelHeader, EmptyPanel,
 } from '@/components/proof-panels';
+import { IndexHealthCard } from '@/components/index-health-card';
 
 export default function DashboardPage() {
   const [stats, setStats] = React.useState<Stats | null>(null);
@@ -131,8 +132,8 @@ export default function DashboardPage() {
       </section>
 
       {(contradictions.length > 0 || obligations.length > 0) && (
-        <section className="grid lg:grid-cols-2 gap-5">
-          <div>
+        <section className="grid lg:grid-cols-2 gap-5 scroll-mt-24">
+          <div id="contradictions" className="scroll-mt-24">
             <PanelHeader title="Contradictions" count={contradictions.length} />
             {contradictions.length === 0 ? (
               <EmptyPanel>No contradictions detected.</EmptyPanel>
@@ -142,7 +143,7 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-          <div>
+          <div id="obligations" className="scroll-mt-24">
             <PanelHeader title="Obligations" count={obligations.length} />
             {obligations.length === 0 ? (
               <EmptyPanel>No tracked obligations.</EmptyPanel>
@@ -185,6 +186,7 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
+          <IndexHealthCard />
         </div>
       </section>
 
@@ -198,7 +200,7 @@ export default function DashboardPage() {
       )}
 
       {files.length > 0 && (
-        <section>
+        <section id="pipeline" className="scroll-mt-24">
           <PanelHeader title="Ingestion pipeline" count={files.length} />
           <p className="text-xs text-muted-fg mb-3 flex items-center gap-1.5">
             <Activity className="h-3 w-3" />

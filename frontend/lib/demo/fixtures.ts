@@ -17,6 +17,7 @@ import type {
   EvidenceDetail,
   FileSummary,
   Health,
+  IndexHealth,
   IngestResponse,
   Stats,
   TimelineEvent,
@@ -642,6 +643,43 @@ export function evidenceFor(chunkId: string): EvidenceDetail | null {
     file,
     neighbors,
     enrichments,
+  };
+}
+
+// ───────────────────────── operational telemetry ─────────────────────────
+
+export function indexHealth(): IndexHealth {
+  const newestIngest = files
+    .map((f) => f.ingested_at)
+    .sort()
+    .at(-1) ?? null;
+  const oldestSource = files
+    .map((f) => f.source_dt)
+    .filter((x): x is string => !!x)
+    .sort()[0] ?? null;
+  const ageSeconds = oldestSource
+    ? Math.round((Date.parse(NOW) - Date.parse(oldestSource)) / 1000)
+    : null;
+  const failed = files.filter((f) => f.status === 'failed').length;
+  const totalBytes = files.reduce((acc, f) => acc + f.bytes, 0);
+  // The seed has one OCR retry on the receipt, but it succeeded — backlog is 0.
+  const ocrBacklog = 0;
+  const embeddingQueue = 0;
+  return {
+    total_files: files.length,
+    total_chunks: chunks.length,
+    total_claims: claims.length,
+    total_obligations: obligations.length,
+    total_contradictions: contradictions.length,
+    failed_files: failed,
+    ocr_backlog: ocrBacklog,
+    embedding_queue_depth: embeddingQueue,
+    last_ingest_at: newestIngest,
+    last_query_at: '2026-04-24T15:14:00Z',
+    last_llm_call_at: '2026-04-22T08:46:14Z',
+    index_age_seconds: ageSeconds,
+    db_bytes: Math.round(totalBytes * 0.18 + 32_768),
+    vector_dim: 384,
   };
 }
 
