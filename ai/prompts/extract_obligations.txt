@@ -1,0 +1,70 @@
+You decide whether a single CLAIM describes a commitment with a specific
+counterparty and a specific deadline, for the Personal Evidence Graph.
+
+WHAT COUNTS AS AN OBLIGATION
+A claim is an obligation if and only if ALL of the following are true:
+  - It states an action or delivery that is promised, owed, or scheduled.
+  - It names (or clearly references) a counterparty (who promised or who is owed).
+  - It has a specific due_at date or datetime — month + day at minimum.
+
+NON-NEGOTIABLE RULES
+1. If ANY of the three are missing or ambiguous, return {"is_obligation": false}.
+2. The "source_excerpt" you return MUST be a verbatim substring (>= 12 chars) of
+   the CHUNK_TEXT — not the claim text. Never paraphrase the excerpt.
+3. counterparty: the OTHER party (the one obligated TO do the thing, or the one
+   who is owed). For "Sequoia will deliver" the counterparty is "Sequoia". For
+   "I will pay Acme" the counterparty is "Acme".
+4. direction:
+   - "incoming" → someone owes the user (Sequoia delivers to me, vendor ships to us)
+   - "outgoing" → the user owes someone (I pay X, we deliver to Y)
+   When the user can't be inferred, prefer "incoming".
+5. due_at: ISO 8601 date or datetime in UTC. If only a date is stated, use
+   T23:59:00Z (end of day). Use FILE_SOURCE_DT below for missing year.
+6. Output ONLY a single JSON object. No prose. No markdown fences.
+
+OUTPUT SHAPE — when it IS an obligation
+{
+  "is_obligation": true,
+  "text": "<one-sentence restatement of the commitment>",
+  "counterparty": "<who is obligated / who is owed>",
+  "direction": "incoming" | "outgoing",
+  "due_at": "2026-04-15T23:59:00Z",
+  "source_excerpt": "<verbatim substring of CHUNK_TEXT>"
+}
+
+OUTPUT SHAPE — when it is NOT an obligation
+{"is_obligation": false}
+
+EXAMPLE 1 — clear delivery commitment
+CLAIM_TEXT: Sequoia Print Co will deliver the April production run by April 15, 2026.
+CHUNK_TEXT: Owner: When will the April run be ready? Sequoia rep: We'll have
+            everything packed and out the door by April 15th.
+FILE_SOURCE_DT: 2026-04-08
+Output:
+{"is_obligation": true,
+ "text": "Sequoia Print Co to deliver April production run",
+ "counterparty": "Sequoia Print Co",
+ "direction": "incoming",
+ "due_at": "2026-04-15T23:59:00Z",
+ "source_excerpt": "out the door by April 15th"}
+
+EXAMPLE 2 — fact, not a commitment
+CLAIM_TEXT: April invoice total is $5,200.00.
+CHUNK_TEXT: INVOICE — Subtotal: $5,200.00. Total due: $5,200.00.
+FILE_SOURCE_DT: 2026-04-21
+Output:
+{"is_obligation": false}
+
+EXAMPLE 3 — commitment with no specific due date
+CLAIM_TEXT: We agreed to revisit the contract someday.
+CHUNK_TEXT: Both parties agreed to revisit the contract someday.
+FILE_SOURCE_DT: 2026-04-08
+Output:
+{"is_obligation": false}
+
+INPUTS
+CLAIM_TEXT: {{claim_text}}
+CHUNK_TEXT: {{chunk_text}}
+FILE_SOURCE_DT: {{file_source_dt}}
+
+Now produce the JSON object.

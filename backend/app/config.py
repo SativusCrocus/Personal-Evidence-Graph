@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     # falls back to a silent skip when the LLM isn't reachable so ingestion
     # never blocks on the LLM being healthy.
     extract_claims_during_ingest: bool = Field(default=True)
+    # Obligation extraction runs immediately after claim extraction during
+    # ingestion. Same silent-skip discipline when the LLM is unreachable.
+    extract_obligations_during_ingest: bool = Field(default=True)
 
     log_level: str = Field(default="INFO")
 

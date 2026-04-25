@@ -236,18 +236,32 @@ def _mark_status(file_id: str, status: str, error: Optional[str] = None) -> None
 
 
 def _maybe_extract_claims(file_id: str, settings: Settings) -> None:
-    """Run the LLM claim extractor for a freshly-ingested file. Never raises."""
-    if not settings.extract_claims_during_ingest:
-        return
-    try:
-        from .claim_extraction import extract_for_file_sync
-        result = extract_for_file_sync(file_id, settings=settings)
-        if result.claims_created or result.chunks_failed:
-            log.info(
-                "claim extraction %s: %d claims, %d dropped, %d chunk failures (%dms)",
-                file_id, result.claims_created,
-                result.claims_dropped_invalid, result.chunks_failed,
-                result.elapsed_ms,
-            )
-    except Exception as e:  # noqa: BLE001
-        log.warning("claim extraction step failed for %s: %s", file_id, e)
+    """Run the LLM claim extractor for a freshly-ingested file, then the
+    obligation extractor on top of the claims that just landed. Never raises."""
+    if settings.extract_claims_during_ingest:
+        try:
+            from .claim_extraction import extract_for_file_sync
+            result = extract_for_file_sync(file_id, settings=settings)
+            if result.claims_created or result.chunks_failed:
+                log.info(
+                    "claim extraction %s: %d claims, %d dropped, %d chunk failures (%dms)",
+                    file_id, result.claims_created,
+                    result.claims_dropped_invalid, result.chunks_failed,
+                    result.elapsed_ms,
+                )
+        except Exception as e:  # noqa: BLE001
+            log.warning("claim extraction step failed for %s: %s", file_id, e)
+
+    if settings.extract_obligations_during_ingest:
+        try:
+            from .obligation_extraction import extract_for_file_sync as ob_extract
+            ob_result = ob_extract(file_id, settings=settings)
+            if ob_result.obligations_created or ob_result.claim_errors:
+                log.info(
+                    "obligation extraction %s: %d obligations, %d rejected, %d errors (%dms)",
+                    file_id, ob_result.obligations_created,
+                    ob_result.rejected_invalid, ob_result.claim_errors,
+                    ob_result.elapsed_ms,
+                )
+        except Exception as e:  # noqa: BLE001
+            log.warning("obligation extraction step failed for %s: %s", file_id, e)
