@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     retrieval_k: int = Field(default=8, ge=1, le=64)
     retrieval_min_score: float = Field(default=0.35, ge=0.0, le=1.0)
 
+    # Cross-encoder reranker. Adds ~100-500ms per query in exchange for
+    # noticeably better top-k ordering when BM25 over-weights literal token
+    # matches. Disabled by setting to False; falls back silently if the
+    # model can't load.
+    reranker_enabled: bool = Field(default=True)
+    reranker_model: str = Field(default="cross-encoder/ms-marco-MiniLM-L-6-v2")
+    reranker_pool: int = Field(default=20, ge=4, le=200)
+
     chunk_tokens: int = Field(default=512, ge=64, le=4096)
     chunk_overlap: int = Field(default=64, ge=0, le=512)
     low_ram_mode: bool = Field(default=False)

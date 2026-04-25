@@ -17,6 +17,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from ai.embeddings import embed_one  # noqa: E402
+from ai.reranker import rerank as ce_rerank  # noqa: E402
 
 from ..config import Settings, get_settings
 from ..deps import get_collection, session_scope
@@ -141,6 +142,36 @@ def _hydrate(
     return out
 
 
+def _apply_reranker(
+    question: str,
+    candidates: list[RetrievedChunk],
+    settings: Settings,
+) -> list[RetrievedChunk]:
+    """Re-order candidates by a cross-encoder. Preserves the semantic-similarity
+    .score field (used by the threshold gate downstream); the rerank score is
+    only used for ordering. Identity-fallback if the model can't load.
+    """
+    if not settings.reranker_enabled or not candidates:
+        return candidates
+    pool = candidates[: settings.reranker_pool]
+    tail = candidates[settings.reranker_pool:]
+    try:
+        ranked = ce_rerank(
+            question,
+            [c.text for c in pool],
+            model_name=settings.reranker_model,
+        )
+    except Exception as e:  # noqa: BLE001
+        log.warning("reranker failed (%s); keeping first-stage order", e)
+        return candidates
+    # Identity fallback returns scores=0 for everything → preserve original order.
+    if all(score == 0.0 for _idx, score in ranked):
+        return candidates
+    reordered = [pool[idx] for idx, _ in ranked]
+    # Append anything beyond the rerank pool unchanged.
+    return reordered + tail
+
+
 def hybrid_search(
     question: str,
     *,
@@ -179,5 +210,9 @@ def hybrid_search(
             return True
         hydrated = [h for h in hydrated if _ok(h)]
 
+    # Threshold gate uses semantic score (well-understood scale). The reranker
+    # can promote a chunk inside the surviving set, but it can't rescue a chunk
+    # that wasn't semantically close enough to clear the floor.
     filtered = [h for h in hydrated if h.score >= final_min]
-    return filtered[:final_k]
+    reranked = _apply_reranker(question, filtered, s)
+    return reranked[:final_k]
