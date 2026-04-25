@@ -26,11 +26,19 @@ router = APIRouter(tags=["claims"])
 def get_claims(
     status: Optional[str] = None,
     file_id: Optional[str] = None,
+    chunk_id: Optional[str] = None,
     limit: int = Query(default=200, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_session),
 ) -> list[ClaimOut]:
-    return list_claims(db, status=status, file_id=file_id, limit=limit, offset=offset)
+    return list_claims(
+        db,
+        status=status,
+        file_id=file_id,
+        chunk_id=chunk_id,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/contradictions", response_model=list[ContradictionOut])

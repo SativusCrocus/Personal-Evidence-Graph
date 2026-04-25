@@ -37,6 +37,22 @@ def test_claims_filtered_by_status():
     assert all(row["status"] == "contradicted" for row in rows)
 
 
+def test_claims_filtered_by_chunk_id():
+    c = _client_with_seed()
+    # Voice memo chunk c_voice_1 grounds the delivery claim and only that one.
+    r = c.get("/claims", params={"chunk_id": "c_voice_1"})
+    assert r.status_code == 200
+    rows = r.json()
+    assert len(rows) == 1
+    assert rows[0]["id"] == "cl_delivery_april_15"
+    assert rows[0]["source_chunk_id"] == "c_voice_1"
+
+    # A chunk with no claims yields an empty list, not a 404.
+    r2 = c.get("/claims", params={"chunk_id": "c_nonexistent"})
+    assert r2.status_code == 200
+    assert r2.json() == []
+
+
 def test_contradictions_returns_invoice_total_change():
     c = _client_with_seed()
     r = c.get("/contradictions")

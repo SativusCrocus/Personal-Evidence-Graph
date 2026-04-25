@@ -69,6 +69,7 @@ def list_claims(
     *,
     status: Optional[str] = None,
     file_id: Optional[str] = None,
+    chunk_id: Optional[str] = None,
     limit: int = 200,
     offset: int = 0,
 ) -> list[ClaimOut]:
@@ -77,6 +78,8 @@ def list_claims(
         stmt = stmt.where(Claim.status == status)
     if file_id:
         stmt = stmt.where(Claim.source_file_id == file_id)
+    if chunk_id:
+        stmt = stmt.where(Claim.source_chunk_id == chunk_id)
     stmt = stmt.order_by(Claim.created_at.desc()).limit(limit).offset(offset)
     rows = db.execute(stmt).scalars().all()
     return [ClaimOut.model_validate(r) for r in rows]

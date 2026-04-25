@@ -389,10 +389,27 @@ export const api = {
 
   // ───────── new endpoints (demo-only until the backend ships them) ─────────
 
-  async claims(): Promise<Claim[]> {
+  async claims(opts?: { status?: string; file_id?: string; chunk_id?: string }): Promise<Claim[]> {
     return withDemo(
-      async () => jsonOrThrow<Claim[]>(await fetchWithTimeout(`${BASE}/claims`, { cache: 'no-store' })),
-      async () => (await import('./demo/fixtures')).claims,
+      async () => {
+        const p = new URLSearchParams();
+        if (opts?.status) p.set('status', opts.status);
+        if (opts?.file_id) p.set('file_id', opts.file_id);
+        if (opts?.chunk_id) p.set('chunk_id', opts.chunk_id);
+        const qs = p.toString();
+        return jsonOrThrow<Claim[]>(await fetchWithTimeout(
+          `${BASE}/claims${qs ? `?${qs}` : ''}`,
+          { cache: 'no-store' },
+        ));
+      },
+      async () => {
+        const all = (await import('./demo/fixtures')).claims;
+        return all.filter((c) =>
+          (!opts?.status || c.status === opts.status) &&
+          (!opts?.file_id || c.source_file_id === opts.file_id) &&
+          (!opts?.chunk_id || c.source_chunk_id === opts.chunk_id),
+        );
+      },
     );
   },
 
