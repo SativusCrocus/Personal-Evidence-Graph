@@ -45,6 +45,7 @@ uploads/
 .coverage
 htmlcov/
 coverage.xml
+tests/fixtures/
 
 # Logs
 *.log
