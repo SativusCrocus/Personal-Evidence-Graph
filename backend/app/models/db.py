@@ -160,3 +160,120 @@ class QueryLog(Base):
     latency_ms: Mapped[Optional[int]] = mapped_column(Integer)
 
     __table_args__ = (Index("idx_query_log_dt", "asked_at"),)
+
+
+# ───────────────────────── claim engine ─────────────────────────
+
+
+class Claim(Base):
+    __tablename__ = "claims"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="supported")
+    confidence: Mapped[float] = mapped_column(nullable=False, default=0.0)
+    source_chunk_id: Mapped[str] = mapped_column(
+        String, ForeignKey("chunks.id", ondelete="CASCADE"), nullable=False
+    )
+    source_file_id: Mapped[str] = mapped_column(
+        String, ForeignKey("files.id", ondelete="CASCADE"), nullable=False
+    )
+    source_excerpt: Mapped[str] = mapped_column(Text, nullable=False)
+    source_dt: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    contradiction_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    obligation_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.current_timestamp()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('supported','contradicted','uncertain','refused')",
+            name="ck_claims_status",
+        ),
+        Index("idx_claims_chunk", "source_chunk_id"),
+        Index("idx_claims_file", "source_file_id"),
+        Index("idx_claims_status", "status"),
+        Index("idx_claims_contr", "contradiction_id"),
+        Index("idx_claims_oblig", "obligation_id"),
+    )
+
+
+class Contradiction(Base):
+    __tablename__ = "contradictions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    topic: Mapped[str] = mapped_column(String, nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    severity: Mapped[str] = mapped_column(String, nullable=False, default="medium")
+    detected_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.current_timestamp()
+    )
+    claim_ids_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    related_chunk_ids_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+
+    __table_args__ = (
+        CheckConstraint("severity IN ('low','medium','high')", name="ck_contr_severity"),
+        Index("idx_contr_severity", "severity"),
+        Index("idx_contr_dt", "detected_at"),
+    )
+
+
+class Obligation(Base):
+    __tablename__ = "obligations"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    counterparty: Mapped[str] = mapped_column(String, nullable=False)
+    direction: Mapped[str] = mapped_column(String, nullable=False)
+    due_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="open")
+    claim_id: Mapped[str] = mapped_column(
+        String, ForeignKey("claims.id", ondelete="CASCADE"), nullable=False
+    )
+    source_chunk_id: Mapped[str] = mapped_column(
+        String, ForeignKey("chunks.id", ondelete="CASCADE"), nullable=False
+    )
+    source_file_id: Mapped[str] = mapped_column(
+        String, ForeignKey("files.id", ondelete="CASCADE"), nullable=False
+    )
+    source_excerpt: Mapped[str] = mapped_column(Text, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "direction IN ('incoming','outgoing')", name="ck_oblig_direction"
+        ),
+        CheckConstraint(
+            "status IN ('open','overdue','completed','cancelled')", name="ck_oblig_status"
+        ),
+        Index("idx_oblig_status", "status"),
+        Index("idx_oblig_due", "due_at"),
+    )
+
+
+class PipelineEvent(Base):
+    __tablename__ = "pipeline_events"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    file_id: Mapped[str] = mapped_column(
+        String, ForeignKey("files.id", ondelete="CASCADE"), nullable=False
+    )
+    stage: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.current_timestamp()
+    )
+    message: Mapped[Optional[str]] = mapped_column(Text)
+
+    __table_args__ = (
+        CheckConstraint(
+            "stage IN ('received','hashed','extracted','chunked','embedded','indexed','queryable')",
+            name="ck_pipeline_stage",
+        ),
+        CheckConstraint(
+            "status IN ('success','failed','retried')", name="ck_pipeline_status"
+        ),
+        Index("idx_pipeline_file", "file_id"),
+        Index("idx_pipeline_stage", "stage"),
+        Index("idx_pipeline_at", "at"),
+    )

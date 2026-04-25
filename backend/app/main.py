@@ -19,7 +19,7 @@ if str(_PROJ) not in sys.path:
 from . import __version__
 from .config import get_settings
 from .deps import get_chroma, get_engine
-from .routers import evidence, files, health, ingest, query, reindex, timeline
+from .routers import claims, evidence, files, health, ingest, query, reindex, timeline
 from .security import limiter
 
 log = logging.getLogger("evg")
@@ -89,6 +89,7 @@ def create_app() -> FastAPI:
     app.include_router(evidence.router)
     app.include_router(reindex.router)
     app.include_router(files.router)
+    app.include_router(claims.router)
 
     @app.get("/")
     def _root():

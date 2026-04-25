@@ -108,3 +108,66 @@ class TimelineEventOut(BaseModel):
     confidence: Optional[float] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ───────────────────────── claim engine ─────────────────────────
+
+ClaimStatus = Literal["supported", "contradicted", "uncertain", "refused"]
+ContradictionSeverity = Literal["low", "medium", "high"]
+ObligationDirection = Literal["incoming", "outgoing"]
+ObligationStatus = Literal["open", "overdue", "completed", "cancelled"]
+PipelineStage = Literal[
+    "received", "hashed", "extracted", "chunked", "embedded", "indexed", "queryable",
+]
+PipelineEventStatus = Literal["success", "failed", "retried"]
+
+
+class ClaimOut(BaseModel):
+    id: str
+    text: str
+    status: ClaimStatus
+    confidence: float = Field(ge=0.0, le=1.0)
+    source_chunk_id: str
+    source_file_id: str
+    source_excerpt: str
+    source_dt: Optional[datetime] = None
+    contradiction_id: Optional[str] = None
+    obligation_id: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ContradictionOut(BaseModel):
+    id: str
+    topic: str
+    summary: str
+    severity: ContradictionSeverity
+    detected_at: datetime
+    claim_ids: list[str] = Field(default_factory=list)
+    related_chunk_ids: list[str] = Field(default_factory=list)
+
+
+class ObligationOut(BaseModel):
+    id: str
+    text: str
+    counterparty: str
+    direction: ObligationDirection
+    due_at: datetime
+    status: ObligationStatus
+    claim_id: str
+    source_chunk_id: str
+    source_file_id: str
+    source_excerpt: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PipelineEventOut(BaseModel):
+    id: str
+    file_id: str
+    stage: PipelineStage
+    status: PipelineEventStatus
+    at: datetime
+    message: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)

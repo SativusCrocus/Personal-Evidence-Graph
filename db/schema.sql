@@ -95,8 +95,73 @@ CREATE TABLE IF NOT EXISTS query_log (
 );
 CREATE INDEX IF NOT EXISTS idx_query_log_dt ON query_log(asked_at);
 
+-- ───────────────────────── claim engine (v2) ─────────────────────────
+
+CREATE TABLE IF NOT EXISTS claims (
+  id                TEXT PRIMARY KEY,
+  text              TEXT NOT NULL,
+  status            TEXT NOT NULL DEFAULT 'supported'
+                      CHECK (status IN ('supported','contradicted','uncertain','refused')),
+  confidence        REAL NOT NULL DEFAULT 0,
+  source_chunk_id   TEXT NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
+  source_file_id    TEXT NOT NULL REFERENCES files(id)  ON DELETE CASCADE,
+  source_excerpt    TEXT NOT NULL,
+  source_dt         TIMESTAMP,
+  contradiction_id  TEXT,
+  obligation_id     TEXT,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_claims_chunk  ON claims(source_chunk_id);
+CREATE INDEX IF NOT EXISTS idx_claims_file   ON claims(source_file_id);
+CREATE INDEX IF NOT EXISTS idx_claims_status ON claims(status);
+CREATE INDEX IF NOT EXISTS idx_claims_contr  ON claims(contradiction_id);
+CREATE INDEX IF NOT EXISTS idx_claims_oblig  ON claims(obligation_id);
+
+CREATE TABLE IF NOT EXISTS contradictions (
+  id           TEXT PRIMARY KEY,
+  topic        TEXT NOT NULL,
+  summary      TEXT NOT NULL,
+  severity     TEXT NOT NULL DEFAULT 'medium'
+                 CHECK (severity IN ('low','medium','high')),
+  detected_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  -- JSON-encoded arrays so we can ship without a junction table for v2.
+  claim_ids_json         TEXT NOT NULL DEFAULT '[]',
+  related_chunk_ids_json TEXT NOT NULL DEFAULT '[]'
+);
+CREATE INDEX IF NOT EXISTS idx_contr_severity ON contradictions(severity);
+CREATE INDEX IF NOT EXISTS idx_contr_dt       ON contradictions(detected_at);
+
+CREATE TABLE IF NOT EXISTS obligations (
+  id              TEXT PRIMARY KEY,
+  text            TEXT NOT NULL,
+  counterparty    TEXT NOT NULL,
+  direction       TEXT NOT NULL CHECK (direction IN ('incoming','outgoing')),
+  due_at          TIMESTAMP NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'open'
+                    CHECK (status IN ('open','overdue','completed','cancelled')),
+  claim_id        TEXT NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
+  source_chunk_id TEXT NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
+  source_file_id  TEXT NOT NULL REFERENCES files(id)  ON DELETE CASCADE,
+  source_excerpt  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_oblig_status ON obligations(status);
+CREATE INDEX IF NOT EXISTS idx_oblig_due    ON obligations(due_at);
+
+CREATE TABLE IF NOT EXISTS pipeline_events (
+  id       TEXT PRIMARY KEY,
+  file_id  TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+  stage    TEXT NOT NULL CHECK (stage IN
+             ('received','hashed','extracted','chunked','embedded','indexed','queryable')),
+  status   TEXT NOT NULL CHECK (status IN ('success','failed','retried')),
+  at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  message  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_pipeline_file  ON pipeline_events(file_id);
+CREATE INDEX IF NOT EXISTS idx_pipeline_stage ON pipeline_events(stage);
+CREATE INDEX IF NOT EXISTS idx_pipeline_at    ON pipeline_events(at);
+
 CREATE TABLE IF NOT EXISTS schema_meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
-INSERT OR IGNORE INTO schema_meta(key, value) VALUES ('version', '1');
+INSERT OR IGNORE INTO schema_meta(key, value) VALUES ('version', '2');
