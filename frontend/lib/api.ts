@@ -190,8 +190,13 @@ export interface PipelineEvent {
 
 // ───────────────────────── demo-mode plumbing ─────────────────────────
 
+// Force demo mode only in production builds — local dev should always try
+// the real backend first, regardless of any leaked env var. This protects
+// users who ran `vercel env pull` from getting stuck in demo mode locally.
 const FORCED_DEMO =
-  typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DEMO_MODE === '1';
+  typeof process !== 'undefined'
+  && process.env.NEXT_PUBLIC_DEMO_MODE === '1'
+  && process.env.NODE_ENV === 'production';
 
 let isDemo = FORCED_DEMO;
 let probed = FORCED_DEMO;
@@ -213,7 +218,35 @@ export function subscribeDemoMode(fn: (on: boolean) => void): () => void {
   return () => demoListeners.delete(fn);
 }
 
-const PROBE_TIMEOUT_MS = 2000;
+/**
+ * Manually exit demo mode and probe the backend again. Used by the demo
+ * banner's "Try local backend" button. If the probe succeeds, demo mode
+ * stays off; if it fails, the banner re-appears.
+ */
+export async function retryBackendProbe(): Promise<{ ok: boolean; error?: string }> {
+  // Reset state so withDemo() will actually try the real fetch.
+  setDemo(false);
+  probed = false;
+  try {
+    const r = await fetchWithTimeout(`${BASE}/health`, { cache: 'no-store' }, 8000);
+    if (!r.ok) {
+      setDemo(true);
+      probed = true;
+      return { ok: false, error: `${r.status} ${r.statusText}` };
+    }
+    probed = true;
+    return { ok: true };
+  } catch (e) {
+    setDemo(true);
+    probed = true;
+    return { ok: false, error: e instanceof Error ? e.message : 'request failed' };
+  }
+}
+
+// 8s gives Next.js dev server enough time to compile the /api/* rewrite
+// on the very first request. Production builds compile rewrites ahead of
+// time so this cushion is essentially free.
+const PROBE_TIMEOUT_MS = 8000;
 
 async function fetchWithTimeout(input: string, init?: RequestInit, ms = PROBE_TIMEOUT_MS): Promise<Response> {
   const ctrl = new AbortController();
